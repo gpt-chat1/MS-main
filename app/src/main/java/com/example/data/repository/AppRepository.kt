@@ -481,22 +481,24 @@ class AppRepository(
                 Task(title = "إعداد الحقائب التدريبية", description = "تجهيز مواد تدريب الموظفين", employeeId = emp2Id, projectId = proj3Id.toInt(), progress = 70, notes = "متبقي المراجعة النهائية", urgency = "Not Urgent", importance = "Important", status = "Pending", dueDate = "2026-07-10")
             )
 
-            // ──────────── Seed Sample Evaluations ────────────
-            evaluationDao.insertEvaluation(
-                EmployeeEvaluation(employeeId = emp1Id, evaluatorAdminId = 1, periodStart = "2026-06-01", periodEnd = "2026-06-30",
-                    taskTimelinessScore = 25.0, qualityScore = 22.0, attendanceScore = 20.0, teamworkScore = 9.0, innovationScore = 8.0, penaltyDeduction = 0.0,
-                    totalScore = 84.0, rating = "جيد جداً", notes = "أداء متميز في إدارة العمليات", createdAt = "2026-06-30")
-            )
-            evaluationDao.insertEvaluation(
-                EmployeeEvaluation(employeeId = emp2Id, evaluatorAdminId = 1, periodStart = "2026-06-01", periodEnd = "2026-06-30",
-                    taskTimelinessScore = 18.0, qualityScore = 20.0, attendanceScore = 16.0, teamworkScore = 8.0, innovationScore = 6.0, penaltyDeduction = -3.0,
-                    totalScore = 65.0, rating = "جيد", notes = "تحتاج تحسين في الالتزام بالمواعيد", createdAt = "2026-06-30")
-            )
-            evaluationDao.insertEvaluation(
-                EmployeeEvaluation(employeeId = emp3Id, evaluatorAdminId = 1, periodStart = "2026-06-01", periodEnd = "2026-06-30",
-                    taskTimelinessScore = 28.0, qualityScore = 24.0, attendanceScore = 20.0, teamworkScore = 9.0, innovationScore = 7.0, penaltyDeduction = 0.0,
-                    totalScore = 88.0, rating = "جيد جداً", notes = "مدقق مالي ممتاز", createdAt = "2026-06-30")
-            )
+            // ──────────── Seed Sample Evaluations (only if admin exists for FK) ────────────
+            if (adminDao.getAdminCount() > 0) {
+                evaluationDao.insertEvaluation(
+                    EmployeeEvaluation(employeeId = emp1Id, evaluatorAdminId = 1, periodStart = "2026-06-01", periodEnd = "2026-06-30",
+                        taskTimelinessScore = 25.0, qualityScore = 22.0, attendanceScore = 20.0, teamworkScore = 9.0, innovationScore = 8.0, penaltyDeduction = 0.0,
+                        totalScore = 84.0, rating = "جيد جداً", notes = "أداء متميز في إدارة العمليات", createdAt = "2026-06-30")
+                )
+                evaluationDao.insertEvaluation(
+                    EmployeeEvaluation(employeeId = emp2Id, evaluatorAdminId = 1, periodStart = "2026-06-01", periodEnd = "2026-06-30",
+                        taskTimelinessScore = 18.0, qualityScore = 20.0, attendanceScore = 16.0, teamworkScore = 8.0, innovationScore = 6.0, penaltyDeduction = -3.0,
+                        totalScore = 65.0, rating = "جيد", notes = "تحتاج تحسين في الالتزام بالمواعيد", createdAt = "2026-06-30")
+                )
+                evaluationDao.insertEvaluation(
+                    EmployeeEvaluation(employeeId = emp3Id, evaluatorAdminId = 1, periodStart = "2026-06-01", periodEnd = "2026-06-30",
+                        taskTimelinessScore = 28.0, qualityScore = 24.0, attendanceScore = 20.0, teamworkScore = 9.0, innovationScore = 7.0, penaltyDeduction = 0.0,
+                        totalScore = 88.0, rating = "جيد جداً", notes = "مدقق مالي ممتاز", createdAt = "2026-06-30")
+                )
+            }
         }
     }
 }
