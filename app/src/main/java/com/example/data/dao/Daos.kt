@@ -79,7 +79,7 @@ interface EmployeeDao {
 
     @Query("""
         SELECT * FROM employees 
-        WHERE name LIKE '%' || :query || '%' OR role LIKE '%' || :query || '%'
+        WHERE name LIKE '%' || :query || '%' OR role LIKE '%' || :query || '%' OR tags LIKE '%' || :query || '%'
         ORDER BY name ASC
     """)
     fun searchEmployees(query: String): Flow<List<Employee>>
@@ -187,6 +187,12 @@ interface InvoiceDao {
 
     @Query("SELECT SUM(amount) FROM invoices")
     fun getTotalInvoiceSumFlow(): Flow<Double?>
+
+    @Query("SELECT * FROM invoices WHERE projectId = :projectId ORDER BY date DESC")
+    fun getInvoicesByProject(projectId: Int): Flow<List<Invoice>>
+
+    @Query("SELECT SUM(amount) FROM invoices WHERE projectId = :projectId")
+    suspend fun getProjectInvoicesSum(projectId: Int): Double?
 }
 
 @Dao

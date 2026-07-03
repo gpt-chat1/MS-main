@@ -64,7 +64,10 @@ data class Employee(
     val avatarUrl: String,
     val status: String = "Active", // Active, Dismissed
     val selfId: String = "",
-    val achievements: String = "" // JSON or comma-separated achievements
+    val achievements: String = "", // JSON or comma-separated achievements
+    val tags: String = "", // comma-separated skills/tags
+    val isOfficeManager: Boolean = false,
+    val isDepartmentManager: Boolean = false
 )
 
 @Entity(
@@ -96,7 +99,8 @@ data class Project(
     val progress: Int = 0, // 0-100
     val departmentId: Int? = null,
     val officeId: Int? = null,
-    val scopeType: String = "SingleOffice" // SingleOffice, SingleDepartment, Shared
+    val scopeType: String = "SingleOffice", // SingleOffice, SingleDepartment, Shared
+    val budget: Double = 0.0
 )
 
 @Entity(
@@ -252,7 +256,8 @@ data class Invoice(
     val description: String,
     val date: String, // YYYY-MM-DD
     val type: String, // Operations, Utility, Supplier
-    val imageUrl: String = ""
+    val imageUrl: String = "",
+    val projectId: Int? = null
 )
 
 // Aggregate Entity models for reporting

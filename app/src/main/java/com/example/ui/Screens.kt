@@ -165,7 +165,7 @@ fun TopAppBarCustom(adminName: String, adminRole: String, onLogout: () -> Unit, 
             }
             Column {
                 Text(
-                    text = "بوابة الشاهين للإدارة",
+                    text = "المدير الذكي",
                     color = DeepGreen,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold
@@ -314,7 +314,7 @@ fun SetupAdminScreen(viewModel: MainViewModel) {
             color = DeepGreen
         )
         Text(
-            text = "Al-Shaheen Portal Secure Initialization",
+            text = "Al-Mudeer Al-Dhaki - Smart Admin Panel",
             fontSize = 11.sp,
             fontWeight = FontWeight.Medium,
             color = Gold,
@@ -489,7 +489,7 @@ fun LoginScreen(viewModel: MainViewModel) {
             color = DeepGreen
         )
         Text(
-            text = "Levantine Heritage Admin Secure System",
+            text = "Al-Mudeer Al-Dhaki - Smart Admin Login",
             fontSize = 11.sp,
             color = Gold,
             modifier = Modifier.padding(top = 4.dp)
@@ -1381,8 +1381,8 @@ fun OrgStructureScreen(viewModel: MainViewModel) {
                             }
                             Column {
                                 val officeManager = employeesList.find { it.officeId == office.id }
-                                Text(officeManager?.name ?: office.managerName, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TextDark)
-                                Text(officeManager?.role ?: "رئيس المكتب", fontSize = 9.sp, color = TextMuted)
+                                Text(officeManager?.name ?: "لا يوجد مدير", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = if (officeManager != null) TextDark else CoralRed)
+                                Text(officeManager?.role ?: "المكتب بحاجة لتعيين مدير", fontSize = 9.sp, color = if (officeManager != null) TextMuted else CoralRed)
                             }
                         }
                     }
@@ -1406,9 +1406,10 @@ fun OrgStructureScreen(viewModel: MainViewModel) {
     if (showAddOfficeDialog) {
         AddOfficeDialog(
             departments = depts,
+            employees = employeesList,
             onDismiss = { showAddOfficeDialog = false },
-            onAdd = { name, deptId, mgr ->
-                viewModel.addOffice(name, deptId, mgr)
+            onAdd = { name, deptId, mgr, mgrId ->
+                viewModel.addOffice(name, deptId, mgr, mgrId)
                 showAddOfficeDialog = false
             }
         )
@@ -1481,7 +1482,7 @@ fun DepartmentOfficesDialog(
                                     Text(office.name, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextDark)
                                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                         val mgr = employees.firstOrNull { it.officeId == office.id }
-                                        Text("مدير: ${mgr?.name ?: office.managerName}", fontSize = 10.sp, color = TextMuted)
+                                        Text(if (mgr != null) "مدير: ${mgr.name}" else "لا يوجد مدير", fontSize = 10.sp, color = if (mgr != null) TextMuted else CoralRed)
                                         Text("$empCount موظف", fontSize = 10.sp, color = DeepGreen, fontWeight = FontWeight.Bold)
                                     }
                                 }
@@ -1503,9 +1504,10 @@ fun DepartmentOfficesDialog(
     if (showAddOffice) {
         AddOfficeDialog(
             departments = listOf(department),
+            employees = employees,
             onDismiss = { showAddOffice = false },
-            onAdd = { name, deptId, mgr ->
-                viewModel.addOffice(name, deptId, mgr)
+            onAdd = { name, deptId, mgr, mgrId ->
+                viewModel.addOffice(name, deptId, mgr, mgrId)
                 showAddOffice = false
             }
         )
@@ -1540,6 +1542,7 @@ fun OfficeMembersDialog(
     val activeEmployees = officeEmployees.filter { it.status == "Active" }
     var deleteConfirmEmp by remember { mutableStateOf<Employee?>(null) }
     var editRoleEmp by remember { mutableStateOf<Employee?>(null) }
+    var editEmpFull by remember { mutableStateOf<Employee?>(null) }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -1555,7 +1558,7 @@ fun OfficeMembersDialog(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(office.name, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = DeepGreen)
                         val at = activeEmployees.firstOrNull()
-                        Text("مدير: ${at?.name ?: office.managerName} • ${activeEmployees.size} موظف نشط", fontSize = 11.sp, color = TextMuted)
+                        Text(if (at != null) "مدير: ${at.name} • ${activeEmployees.size} موظف نشط" else "لا يوجد مدير • ${activeEmployees.size} موظف نشط", fontSize = 11.sp, color = if (at != null) TextMuted else CoralRed)
                     }
                 }
 
@@ -1587,6 +1590,9 @@ fun OfficeMembersDialog(
                                     IconButton(onClick = { editRoleEmp = emp }, modifier = Modifier.size(32.dp)) {
                                         Icon(Icons.Filled.Edit, contentDescription = "تعديل المنصب", tint = Gold, modifier = Modifier.size(16.dp))
                                     }
+                                    IconButton(onClick = { editEmpFull = emp }, modifier = Modifier.size(32.dp)) {
+                                        Icon(Icons.Filled.Person, contentDescription = "تعديل البيانات", tint = DeepGreen, modifier = Modifier.size(16.dp))
+                                    }
                                     IconButton(onClick = { deleteConfirmEmp = emp }, modifier = Modifier.size(32.dp)) {
                                         Icon(Icons.Filled.PersonOff, contentDescription = "حذف", tint = CoralRed, modifier = Modifier.size(16.dp))
                                     }
@@ -1610,6 +1616,17 @@ fun OfficeMembersDialog(
             onSave = { newRole ->
                 viewModel.updateEmployeeRole(emp, newRole)
                 editRoleEmp = null
+            }
+        )
+    }
+
+    editEmpFull?.let { emp ->
+        EditEmployeeDialog(
+            employee = emp,
+            onDismiss = { editEmpFull = null },
+            onSave = { updated ->
+                viewModel.updateEmployeeFull(updated)
+                editEmpFull = null
             }
         )
     }
@@ -2698,12 +2715,15 @@ fun AddDepartmentDialog(
 @Composable
 fun AddOfficeDialog(
     departments: List<Department>,
+    employees: List<Employee>,
     onDismiss: () -> Unit,
-    onAdd: (String, Int, String) -> Unit
+    onAdd: (String, Int, String, Int?) -> Unit
 ) {
     var name by remember { mutableStateOf("") }
     var deptId by remember { mutableStateOf(departments.firstOrNull()?.id ?: 0) }
-    var mgr by remember { mutableStateOf("") }
+    var selectedMgrId by remember { mutableStateOf<Int?>(null) }
+    var mgrDropdownExpanded by remember { mutableStateOf(false) }
+    val eligibleEmployees = employees.filter { !it.isOfficeManager && !it.isDepartmentManager && it.status == "Active" }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -2740,12 +2760,29 @@ fun AddOfficeDialog(
                     }
                 }
 
-                ShaheenOutlinedTextField(
-                    value = mgr,
-                    onValueChange = { mgr = it },
-                    label = { Text("رئيس المكتب التنفيذي") },
-                    modifier = Modifier.fillMaxWidth()
-                )
+                Text("رئيس المكتب التنفيذي:", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Box {
+                    ShaheenOutlinedTextField(
+                        value = eligibleEmployees.find { it.id == selectedMgrId }?.name ?: "",
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("اختر مديراً") },
+                        modifier = Modifier.fillMaxWidth().clickable { mgrDropdownExpanded = true },
+                        placeholder = { Text(if (eligibleEmployees.isEmpty()) "لا يوجد موظفون متاحون" else "اضغط للاختيار") }
+                    )
+                    DropdownMenu(expanded = mgrDropdownExpanded, onDismissRequest = { mgrDropdownExpanded = false }) {
+                        if (eligibleEmployees.isEmpty()) {
+                            DropdownMenuItem(text = { Text("لا يوجد موظفون متاحون", color = TextMuted) }, onClick = { mgrDropdownExpanded = false })
+                        } else {
+                            eligibleEmployees.forEach { emp ->
+                                DropdownMenuItem(
+                                    text = { Text("${emp.name} (${emp.role})", fontSize = 12.sp) },
+                                    onClick = { selectedMgrId = emp.id; mgrDropdownExpanded = false }
+                                )
+                            }
+                        }
+                    }
+                }
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -2756,7 +2793,10 @@ fun AddOfficeDialog(
                     }
                     Button(
                         onClick = {
-                            if (name.isNotBlank()) onAdd(name, deptId, mgr)
+                            if (name.isNotBlank()) {
+                                val mgrName = eligibleEmployees.find { it.id == selectedMgrId }?.name ?: ""
+                                onAdd(name, deptId, mgrName, selectedMgrId)
+                            }
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = DeepGreen),
                         modifier = Modifier.weight(1f)
@@ -2802,6 +2842,39 @@ fun EditEmployeeRoleDialog(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+fun EditEmployeeDialog(
+    employee: Employee,
+    onDismiss: () -> Unit,
+    onSave: (Employee) -> Unit
+) {
+    var name by remember { mutableStateOf(employee.name) }
+    var role by remember { mutableStateOf(employee.role) }
+    var selfId by remember { mutableStateOf(employee.selfId) }
+    var branch by remember { mutableStateOf(employee.branchLocation) }
+    var achievements by remember { mutableStateOf(employee.achievements) }
+    var tags by remember { mutableStateOf(employee.tags) }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = WarmBackground), modifier = Modifier.padding(16.dp)) {
+            Column(modifier = Modifier.padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("تعديل بيانات: ${employee.name}", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = DeepGreen)
+                ShaheenOutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("الاسم") }, modifier = Modifier.fillMaxWidth())
+                ShaheenOutlinedTextField(value = selfId, onValueChange = { selfId = it }, label = { Text("الرقم الذاتي") }, modifier = Modifier.fillMaxWidth())
+                ShaheenOutlinedTextField(value = role, onValueChange = { role = it }, label = { Text("المنصب") }, modifier = Modifier.fillMaxWidth())
+                ShaheenOutlinedTextField(value = branch, onValueChange = { branch = it }, label = { Text("الفرع") }, modifier = Modifier.fillMaxWidth())
+                ShaheenOutlinedTextField(value = achievements, onValueChange = { achievements = it }, label = { Text("الإنجازات") }, modifier = Modifier.fillMaxWidth())
+                ShaheenOutlinedTextField(value = tags, onValueChange = { tags = it }, label = { Text("المهارات") }, modifier = Modifier.fillMaxWidth())
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("إلغاء", color = TextMuted) }
+                    Button(onClick = { onSave(employee.copy(name = name, selfId = selfId, role = role, branchLocation = branch, achievements = achievements, tags = tags)) }, colors = ButtonDefaults.buttonColors(containerColor = DeepGreen), modifier = Modifier.weight(1f)) { Text("حفظ", color = Color.White) }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
 fun AddEmployeeDialog(
     viewModel: MainViewModel,
     offices: List<Office>,
@@ -2813,6 +2886,7 @@ fun AddEmployeeDialog(
     var branch by remember { mutableStateOf("المقر الرئيسي - الرياض") }
     var selfId by remember { mutableStateOf("") }
     var achievements by remember { mutableStateOf("") }
+    var tags by remember { mutableStateOf("") }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -2877,6 +2951,13 @@ fun AddEmployeeDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
 
+                ShaheenOutlinedTextField(
+                    value = tags,
+                    onValueChange = { tags = it },
+                    label = { Text("المهارات / الخبرات (مفصولة بفواصل)") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -2887,7 +2968,7 @@ fun AddEmployeeDialog(
                     Button(
                         onClick = {
                             if (name.isNotBlank()) {
-                                viewModel.addEmployee(name, role, officeId, branch, selfId, achievements)
+                                viewModel.addEmployee(name, role, officeId, branch, selfId, achievements, tags)
                                 onDismiss()
                             }
                         },
@@ -3583,6 +3664,27 @@ fun SettingsScreen(viewModel: MainViewModel) {
                         Text("إعادة الشعار الافتراضي", color = CoralRed)
                     }
                 }
+            }
+        }
+
+        // Organization info
+        val orgName by viewModel.orgName.collectAsState()
+        val branchName by viewModel.branchName.collectAsState()
+        Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("بيانات المؤسسة", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = DeepGreen)
+                Spacer(modifier = Modifier.height(8.dp))
+                ShaheenOutlinedTextField(
+                    value = orgName, onValueChange = { viewModel.setOrgName(it) },
+                    label = { Text("الإدارة") }, modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                ShaheenOutlinedTextField(
+                    value = branchName, onValueChange = { viewModel.setBranchName(it) },
+                    label = { Text("الفرع") }, modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
             }
         }
 

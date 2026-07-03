@@ -42,7 +42,7 @@ import com.example.data.entity.Task
         Invoice::class,
         EmployeeEvaluation::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

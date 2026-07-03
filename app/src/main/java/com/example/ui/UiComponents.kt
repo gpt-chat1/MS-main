@@ -131,16 +131,15 @@ fun DatePickerField(
     )
 
     if (showPicker) {
-        val initialMillis = remember(selectedDate) {
-            try {
-                if (selectedDate.isNotBlank()) {
-                    SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).parse(selectedDate)?.time
-                } else null
-            } catch (_: Exception) {
-                null
-            } ?: System.currentTimeMillis()
-        }
+        val initialMillis = try {
+            if (selectedDate.isNotBlank()) {
+                SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).parse(selectedDate)?.time
+            } else null
+        } catch (_: Exception) {
+            null
+        } ?: System.currentTimeMillis()
         val state = rememberDatePickerState(initialSelectedDateMillis = initialMillis)
+        LaunchedEffect(state.selectedDateMillis) { state.selectedDateMillis?.let { } }
         DatePickerDialog(
             onDismissRequest = { showPicker = false },
             confirmButton = {

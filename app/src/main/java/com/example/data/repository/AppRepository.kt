@@ -137,6 +137,11 @@ class AppRepository(
         }.getOrElse { RepositoryResult.Failure("تعذر تحديث بيانات الموظف") }
     }
 
+    suspend fun setEmployeeAsOfficeManager(employeeId: Int, isManager: Boolean) {
+        val emp = employeeDao.getEmployeeById(employeeId) ?: return
+        employeeDao.updateEmployee(emp.copy(isOfficeManager = isManager))
+    }
+
     suspend fun dismissEmployee(employee: Employee) {
         employeeDao.updateEmployee(employee.copy(status = "Dismissed"))
         addTimelineActivity("تم تسريح الموظف: ${employee.name}", "الآن", false)
@@ -205,6 +210,8 @@ class AppRepository(
 
     suspend fun deleteInvoice(invoice: Invoice) = invoiceDao.deleteInvoice(invoice)
     fun getTotalInvoiceSumFlow(): Flow<Double?> = invoiceDao.getTotalInvoiceSumFlow()
+    fun getInvoicesByProject(projectId: Int): Flow<List<Invoice>> = invoiceDao.getInvoicesByProject(projectId)
+    suspend fun getProjectInvoicesSum(projectId: Int): Double? = invoiceDao.getProjectInvoicesSum(projectId)
 
     // ──────────── PROJECT DAOs ────────────
     fun getAllProjects(): Flow<List<Project>> = projectDao.getAllProjects()
@@ -348,15 +355,15 @@ class AppRepository(
 
             // Seed Employees
             val emp1Id = employeeDao.insertEmployee(
-                Employee(name = "أحمد منصور", role = "مدير العمليات الإقليمي", officeId = logOfficeId, branchLocation = "المكتب الرئيسي - الرياض", avatarUrl = "", selfId = "EMP-001", achievements = "قيادة فريق التتبع اللوجستي، تطوير نظام تشغيل الأسطول")
+                Employee(name = "أحمد منصور", role = "مدير العمليات الإقليمي", officeId = logOfficeId, branchLocation = "المكتب الرئيسي - الرياض", avatarUrl = "", selfId = "EMP-001", achievements = "قيادة فريق التتبع اللوجستي، تطوير نظام تشغيل الأسطول", tags = "قيادة, لوجستيات, تخطيط استراتيجي", isOfficeManager = true)
             ).toInt()
 
             val emp2Id = employeeDao.insertEmployee(
-                Employee(name = "سارة العتيبي", role = "أخصائي موارد بشرية", officeId = hrOfficeId, branchLocation = "فرع جدة - المنطقة الغربية", avatarUrl = "", selfId = "EMP-002", achievements = "إعداد 3 برامج تدريبية، تطوير سياسة الموارد البشرية")
+                Employee(name = "سارة العتيبي", role = "أخصائي موارد بشرية", officeId = hrOfficeId, branchLocation = "فرع جدة - المنطقة الغربية", avatarUrl = "", selfId = "EMP-002", achievements = "إعداد 3 برامج تدريبية، تطوير سياسة الموارد البشرية", tags = "موارد بشرية, توظيف, تدريب")
             ).toInt()
 
             val emp3Id = employeeDao.insertEmployee(
-                Employee(name = "فهد القحطاني", role = "مدقق مالي أول", officeId = auditOfficeId, branchLocation = "المكتب الرئيسي - الرياض", avatarUrl = "", selfId = "EMP-003", achievements = "تدقيق مالي 2026، إعداد تقارير الربع السنوي")
+                Employee(name = "فهد القحطاني", role = "مدقق مالي أول", officeId = auditOfficeId, branchLocation = "المكتب الرئيسي - الرياض", avatarUrl = "", selfId = "EMP-003", achievements = "تدقيق مالي 2026، إعداد تقارير الربع السنوي", tags = "تدقيق, مالية, محاسبة", isOfficeManager = true)
             ).toInt()
 
             // Seed Tasks with Eisenhower metrics

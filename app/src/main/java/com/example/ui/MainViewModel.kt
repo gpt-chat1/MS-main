@@ -50,6 +50,10 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
     // Settings
     private val _logoUri = MutableStateFlow<String?>(null)
     val logoUri: StateFlow<String?> = _logoUri.asStateFlow()
+    private val _orgName = MutableStateFlow("")
+    val orgName: StateFlow<String> = _orgName.asStateFlow()
+    private val _branchName = MutableStateFlow("")
+    val branchName: StateFlow<String> = _branchName.asStateFlow()
 
     // Database reactive streams
     val departments = repository.getAllDepartments().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -80,7 +84,7 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
     ) { list, query, deptId ->
         var result = list
         if (query.isNotEmpty()) {
-            result = result.filter { it.name.contains(query, ignoreCase = true) || it.role.contains(query, ignoreCase = true) }
+            result = result.filter { it.name.contains(query, ignoreCase = true) || it.role.contains(query, ignoreCase = true) || it.tags.contains(query, ignoreCase = true) }
         }
         if (deptId != null) {
             // Filter offices by this department
@@ -190,16 +194,19 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
         }
     }
 
-    fun addOffice(name: String, departmentId: Int, managerName: String) {
+    fun addOffice(name: String, departmentId: Int, managerName: String, managerId: Int? = null) {
         viewModelScope.launch {
             publishResult(repository.insertOffice(Office(name = name, departmentId = departmentId, managerName = managerName, status = "Active")))
+            if (managerId != null) {
+                repository.setEmployeeAsOfficeManager(managerId, true)
+            }
         }
     }
 
-    fun addEmployee(name: String, role: String, officeId: Int, branchLocation: String, selfId: String = "", achievements: String = "") {
+    fun addEmployee(name: String, role: String, officeId: Int, branchLocation: String, selfId: String = "", achievements: String = "", tags: String = "") {
         viewModelScope.launch {
             publishResult(repository.insertEmployee(
-                Employee(name = name, role = role, officeId = officeId, branchLocation = branchLocation, avatarUrl = "", status = "Active", selfId = selfId, achievements = achievements)
+                Employee(name = name, role = role, officeId = officeId, branchLocation = branchLocation, avatarUrl = "", status = "Active", selfId = selfId, achievements = achievements, tags = tags)
             ))
         }
     }
@@ -207,6 +214,12 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
     fun updateEmployeeRole(employee: Employee, newRole: String) {
         viewModelScope.launch {
             publishResult(repository.updateEmployee(employee.copy(role = newRole)))
+        }
+    }
+
+    fun updateEmployeeFull(employee: Employee) {
+        viewModelScope.launch {
+            publishResult(repository.updateEmployee(employee))
         }
     }
 
@@ -397,12 +410,14 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
     // ──────────── SETTINGS ────────────
     fun setLogoUri(uri: String) {
         _logoUri.value = uri
-        // In a real app, persist with SharedPreferences
     }
 
     fun clearLogo() {
         _logoUri.value = null
     }
+
+    fun setOrgName(name: String) { _orgName.value = name }
+    fun setBranchName(name: String) { _branchName.value = name }
 
     // Advanced reporting engines trigger
     fun exportPdf(context: Context, onComplete: (File) -> Unit) {
