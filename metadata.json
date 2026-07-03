@@ -1,0 +1,6 @@
+{
+  "name": "بوابة الشاهين للإدارة",
+  "description": "نظام الشاهين المتكامل لإدارة الهيكل التنظيمي، الموظفين، والمهام والتقارير مع نظام حماية وتشفير البيانات المحلي المدمج.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
