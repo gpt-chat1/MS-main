@@ -167,6 +167,8 @@ class AppRepository(
         addTimelineActivity("تم تعيين مهمة جديدة: '${task.title}'", "الآن", true)
         return id
     }
+    fun getTasksByProjectOrdered(projectId: Int): Flow<List<Task>> = taskDao.getTasksByProjectOrdered(projectId)
+    suspend fun updateTaskOrder(taskId: Int, order: Int) = taskDao.updateTaskOrder(taskId, order)
     suspend fun updateTaskStatus(taskId: Int, progress: Int, status: String, notes: String, taskTitle: String) {
         taskDao.updateTaskStatus(taskId, progress, status, notes)
         val statusText = if (status == "Completed") "مكتملة" else "تحت المراجعة ($progress%)"

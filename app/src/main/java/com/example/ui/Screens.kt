@@ -3392,6 +3392,9 @@ fun ProjectDetailScreen(viewModel: MainViewModel, projectId: Int) {
     val tasksList by viewModel.tasks.collectAsState()
     val projectTasks = tasksList.filter { it.projectId == projectId }
     val projectMembers by viewModel.getEmployeesByProject(projectId).collectAsState(initial = emptyList())
+    val membersList by viewModel.getMembersByProject(projectId).collectAsState(initial = emptyList())
+    val projectTasksOrdered by viewModel.getTasksByProjectOrdered(projectId).collectAsState(initial = emptyList())
+    val invoicesList by viewModel.invoices.collectAsState()
     val context = LocalContext.current
 
     if (project == null) {
@@ -3582,10 +3585,29 @@ fun ProjectDetailScreen(viewModel: MainViewModel, projectId: Int) {
             project = project,
             departments = depts,
             offices = officesList,
+            employees = employeesList,
+            invoices = invoicesList,
+            members = membersList,
+            tasks = projectTasksOrdered,
             onDismiss = { showEditProjectDialog = false },
             onSave = { updated ->
                 viewModel.updateProject(updated)
                 showEditProjectDialog = false
+            },
+            onAddMember = { empId, role ->
+                viewModel.addProjectMember(projectId, empId, role)
+            },
+            onRemoveMember = { empId ->
+                viewModel.removeProjectMember(projectId, empId)
+            },
+            onAddTask = { title, desc, empId, urg, imp, date ->
+                viewModel.assignTaskToProject(title, desc, empId, projectId, urg, imp, date)
+            },
+            onLinkInvoice = { invId ->
+                viewModel.linkInvoiceToProject(invId, projectId)
+            },
+            onReorderTask = { taskId, newOrder ->
+                viewModel.reorderTask(taskId, newOrder)
             }
         )
     }
@@ -3959,17 +3981,57 @@ fun EditProjectDialog(
     project: Project,
     departments: List<Department>,
     offices: List<Office>,
+    employees: List<Employee>,
+    invoices: List<Invoice>,
+    members: List<ProjectMember>,
+    tasks: List<Task>,
     onDismiss: () -> Unit,
-    onSave: (Project) -> Unit
+    onSave: (Project) -> Unit,
+    onAddMember: (Int, String) -> Unit,
+    onRemoveMember: (Int) -> Unit,
+    onAddTask: (String, String, Int, String, String, String) -> Unit,
+    onLinkInvoice: (Int) -> Unit,
+    onReorderTask: (Int, Int) -> Unit
 ) {
+    var name by remember { mutableStateOf(project.name) }
+    var desc by remember { mutableStateOf(project.description) }
+    var startDate by remember { mutableStateOf(project.startDate) }
+    var dueDate by remember { mutableStateOf(project.dueDate) }
+    var priority by remember { mutableStateOf(project.priority) }
     var scopeType by remember { mutableStateOf(project.scopeType) }
     var deptId by remember { mutableStateOf(project.departmentId) }
     var officeId by remember { mutableStateOf(project.officeId) }
+    var budget by remember { mutableStateOf(if (project.budget > 0) project.budget.toString() else "") }
+    var showMembers by remember { mutableStateOf(false) }
+    var showTasks by remember { mutableStateOf(false) }
+    var showInvoices by remember { mutableStateOf(false) }
+
+    val projectInvoices = invoices.filter { it.projectId == project.id }
+    val totalExpenses = projectInvoices.sumOf { it.amount }
+    val sortedTasks = remember(tasks) { tasks.sortedBy { it.sortOrder } }
 
     Dialog(onDismissRequest = onDismiss) {
-        Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = WarmBackground)) {
+        Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = WarmBackground), modifier = Modifier.padding(8.dp)) {
             Column(modifier = Modifier.padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("تعديل: ${project.name}", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = DeepGreen)
+
+                ShaheenOutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("اسم المشروع") }, modifier = Modifier.fillMaxWidth())
+                ShaheenOutlinedTextField(value = desc, onValueChange = { desc = it }, label = { Text("الوصف") }, modifier = Modifier.fillMaxWidth())
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    DatePickerField(label = "تاريخ البداية", selectedDate = startDate, onDateSelected = { startDate = it }, modifier = Modifier.weight(1f))
+                    DatePickerField(label = "تاريخ النهاية", selectedDate = dueDate, onDateSelected = { dueDate = it }, modifier = Modifier.weight(1f))
+                }
+
+                ShaheenOutlinedTextField(value = budget, onValueChange = { budget = it }, label = { Text("الميزانية (ر.س)") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
+
+                Text("الأولوية:", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf("Low" to "منخفضة", "Medium" to "متوسطة", "High" to "عالية", "Critical" to "حرجة").forEach { (key, label) ->
+                        FilterChip(selected = priority == key, onClick = { priority = key }, label = { Text(label, fontSize = 10.sp) })
+                    }
+                }
+
                 Text("نطاق المشروع:", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     listOf("SingleOffice" to "مكتب", "SingleDepartment" to "قسم", "Shared" to "مشترك").forEach { (key, label) ->
@@ -3992,19 +4054,128 @@ fun EditProjectDialog(
                         }
                     }
                 }
+
+                // Budget & Expenses Summary
+                Card(shape = RoundedCornerShape(10.dp), colors = CardDefaults.cardColors(containerColor = DeepGreen.copy(alpha = 0.08f))) {
+                    Row(modifier = Modifier.padding(12.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("الميزانية", fontSize = 10.sp, color = TextMuted)
+                            Text("${budget.toDoubleOrNull() ?: project.budget} ر.س", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = DeepGreen)
+                        }
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("المصروفات", fontSize = 10.sp, color = TextMuted)
+                            Text("${totalExpenses} ر.س", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = if (totalExpenses > (budget.toDoubleOrNull() ?: project.budget)) CoralRed else DeepGreen)
+                        }
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("المتبقي", fontSize = 10.sp, color = TextMuted)
+                            val remaining = (budget.toDoubleOrNull() ?: project.budget) - totalExpenses
+                            Text("${String.format("%.0f", remaining)} ر.س", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = if (remaining < 0) CoralRed else DeepGreen)
+                        }
+                    }
+                }
+
+                // Members section
+                TextButton(onClick = { showMembers = !showMembers }) {
+                    Icon(if (showMembers) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("أعضاء المشروع (${members.size})", fontSize = 12.sp, color = DeepGreen)
+                }
+                if (showMembers) {
+                    members.forEach { pm ->
+                        val emp = employees.find { it.id == pm.employeeId }
+                        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("${emp?.name ?: "موظف"} - ${pm.role}", fontSize = 11.sp)
+                            IconButton(onClick = { onRemoveMember(pm.employeeId) }, modifier = Modifier.size(24.dp)) {
+                                Icon(Icons.Filled.Close, contentDescription = "إزالة", tint = CoralRed, modifier = Modifier.size(14.dp))
+                            }
+                        }
+                    }
+                    val nonMembers = employees.filter { e -> members.none { it.employeeId == e.id } && e.status == "Active" }
+                    if (nonMembers.isNotEmpty()) {
+                        var selectedNewMember by remember { mutableStateOf(nonMembers.firstOrNull()?.id ?: 0) }
+                        var role by remember { mutableStateOf("Member") }
+                        Text("إضافة عضو:", fontSize = 11.sp, color = TextMuted)
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            nonMembers.take(6).forEach { e ->
+                                FilterChip(selected = selectedNewMember == e.id, onClick = { selectedNewMember = e.id }, label = { Text(e.name, fontSize = 9.sp) })
+                            }
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            listOf("Lead" to "قائد", "Member" to "عضو", "Reviewer" to "مراجع").forEach { (k, lbl) ->
+                                FilterChip(selected = role == k, onClick = { role = k }, label = { Text(lbl, fontSize = 9.sp) })
+                            }
+                            IconButton(onClick = { onAddMember(selectedNewMember, role) }, modifier = Modifier.size(28.dp)) {
+                                Icon(Icons.Filled.Add, contentDescription = "إضافة", tint = DeepGreen)
+                            }
+                        }
+                    }
+                }
+
+                // Tasks section
+                TextButton(onClick = { showTasks = !showTasks }) {
+                    Icon(if (showTasks) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("مهام المشروع (${sortedTasks.size})", fontSize = 12.sp, color = DeepGreen)
+                }
+                if (showTasks) {
+                    sortedTasks.forEachIndexed { idx, t ->
+                        val emp = employees.find { it.id == t.employeeId }
+                        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(t.title, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TextDark)
+                                Text("${emp?.name ?: "—"} • ${t.progress}%", fontSize = 9.sp, color = TextMuted)
+                            }
+                            Row {
+                                if (idx > 0) IconButton(onClick = { onReorderTask(t.id, t.sortOrder - 1) }, modifier = Modifier.size(24.dp)) { Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "↑", tint = DeepGreen, modifier = Modifier.size(14.dp)) }
+                                if (idx < sortedTasks.lastIndex) IconButton(onClick = { onReorderTask(t.id, t.sortOrder + 1) }, modifier = Modifier.size(24.dp)) { Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "↓", tint = DeepGreen, modifier = Modifier.size(14.dp)) }
+                            }
+                        }
+                    }
+                    var showAddTask by remember { mutableStateOf(false) }
+                    TextButton(onClick = { showAddTask = true }) { Text("+ إضافة مهمة", fontSize = 11.sp, color = DeepGreen) }
+                    if (showAddTask) {
+                        AddProjectTaskDialog(projectId = project.id, employees = employees, onDismiss = { showAddTask = false }, onAdd = { title, desc, empId, urgency, importance, date -> onAddTask(title, desc, empId, urgency, importance, date); showAddTask = false })
+                    }
+                }
+
+                // Invoices section
+                TextButton(onClick = { showInvoices = !showInvoices }) {
+                    Icon(if (showInvoices) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("الفواتير المرتبطة (${projectInvoices.size})", fontSize = 12.sp, color = DeepGreen)
+                }
+                if (showInvoices) {
+                    projectInvoices.forEach { inv ->
+                        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("${inv.trackingNumber} - ${inv.amount} ر.س", fontSize = 11.sp)
+                            Text(inv.date, fontSize = 9.sp, color = TextMuted)
+                        }
+                    }
+                    val unlinkedInvoices = invoices.filter { it.projectId == null || it.projectId != project.id }
+                    if (unlinkedInvoices.isNotEmpty()) {
+                        Text("ربط فاتورة:", fontSize = 11.sp, color = TextMuted)
+                        unlinkedInvoices.take(5).forEach { inv ->
+                            TextButton(onClick = { onLinkInvoice(inv.id) }) {
+                                Text("${inv.trackingNumber} - ${inv.amount} ر.س", fontSize = 10.sp, color = DeepGreen)
+                            }
+                        }
+                    }
+                }
+
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     TextButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("إلغاء", color = TextMuted) }
                     Button(
                         onClick = {
                             onSave(project.copy(
-                                departmentId = deptId,
+                                name = name, description = desc, startDate = startDate, dueDate = dueDate,
+                                priority = priority, departmentId = deptId,
                                 officeId = if (scopeType == "SingleOffice") officeId else null,
-                                scopeType = scopeType
+                                scopeType = scopeType, budget = budget.toDoubleOrNull() ?: project.budget
                             ))
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = DeepGreen),
                         modifier = Modifier.weight(1f)
-                    ) { Text("حفظ", color = Color.White) }
+                    ) { Text("حفظ التعديلات", color = Color.White) }
                 }
             }
         }

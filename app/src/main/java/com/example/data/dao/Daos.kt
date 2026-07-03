@@ -119,6 +119,12 @@ interface TaskDao {
     @Query("SELECT * FROM tasks WHERE employeeId = :employeeId ORDER BY id DESC")
     fun getTasksByEmployee(employeeId: Int): Flow<List<Task>>
 
+    @Query("SELECT * FROM tasks WHERE projectId = :projectId ORDER BY sortOrder ASC, id ASC")
+    fun getTasksByProjectOrdered(projectId: Int): Flow<List<Task>>
+
+    @Query("UPDATE tasks SET sortOrder = :order WHERE id = :taskId")
+    suspend fun updateTaskOrder(taskId: Int, order: Int)
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertTask(task: Task): Long
 

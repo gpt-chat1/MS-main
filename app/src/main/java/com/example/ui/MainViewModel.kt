@@ -344,6 +344,14 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
         }
     }
 
+    fun linkInvoiceToProject(invoiceId: Int, projectId: Int) {
+        viewModelScope.launch {
+            val allInvoices = repository.getAllInvoices().first()
+            val inv = allInvoices.find { it.id == invoiceId } ?: return@launch
+            repository.updateInvoice(inv.copy(projectId = projectId))
+        }
+    }
+
     fun removeProjectMember(projectId: Int, employeeId: Int) {
         viewModelScope.launch {
             repository.removeProjectMember(projectId, employeeId)
@@ -362,6 +370,14 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
     }
 
     fun getEmployeesByProject(projectId: Int) = repository.getEmployeesByProject(projectId)
+
+    fun getMembersByProject(projectId: Int) = repository.getMembersByProject(projectId)
+
+    fun getTasksByProjectOrdered(projectId: Int) = repository.getTasksByProjectOrdered(projectId)
+
+    fun reorderTask(taskId: Int, newOrder: Int) {
+        viewModelScope.launch { repository.updateTaskOrder(taskId, newOrder) }
+    }
 
     // ──────────── EVALUATION ACTIONS ────────────
     fun selectEmployeeForEvaluation(employeeId: Int, employeeName: String) {

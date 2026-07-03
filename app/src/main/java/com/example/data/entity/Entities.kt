@@ -193,7 +193,8 @@ data class Task(
     val urgency: String, // Urgent, Not Urgent
     val importance: String, // Important, Not Important
     val status: String, // Pending, Completed, Critical
-    val dueDate: String
+    val dueDate: String,
+    val sortOrder: Int = 0
 )
 
 @Entity(
