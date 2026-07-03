@@ -3518,12 +3518,13 @@ fun ProjectDetailScreen(viewModel: MainViewModel, projectId: Int) {
                     Text("لا يوجد أعضاء", fontSize = 12.sp, color = TextMuted)
                 } else {
                     projectMembers.forEach { emp ->
+                        val projectRole = membersList.find { it.employeeId == emp.id }?.role ?: ""
                         Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Filled.Person, contentDescription = null, tint = DeepGreen, modifier = Modifier.size(20.dp))
                             Spacer(modifier = Modifier.width(8.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(emp.name, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                Text(emp.role, fontSize = 10.sp, color = TextMuted)
+                                Text("${emp.role} | دور بالمشروع: $projectRole", fontSize = 10.sp, color = TextMuted)
                             }
                         }
                     }
@@ -3833,6 +3834,7 @@ fun SettingsScreen(viewModel: MainViewModel) {
                     Text("لا توجد تقارير مصدرة بعد", fontSize = 12.sp, color = TextMuted)
                 } else {
                     savedReports.take(10).forEach { report ->
+                        val mimeType = if (report.name.endsWith(".csv")) "text/csv" else "application/pdf"
                         Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(report.name, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TextDark)
@@ -3840,17 +3842,21 @@ fun SettingsScreen(viewModel: MainViewModel) {
                             }
                             Row {
                                 IconButton(onClick = {
-                                    val uri = FileProvider.getUriForFile(context, "com.example.fileprovider", report)
-                                    val intent = Intent(Intent.ACTION_VIEW).apply {
-                                        setDataAndType(uri, "application/pdf")
-                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    try {
+                                        val uri = FileProvider.getUriForFile(context, "com.example.fileprovider", report)
+                                        val intent = Intent(Intent.ACTION_VIEW).apply {
+                                            setDataAndType(uri, mimeType)
+                                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                        }
+                                        context.startActivity(intent)
+                                    } catch (_: Exception) {
+                                        Toast.makeText(context, "لا يوجد تطبيق لفتح هذا الملف", Toast.LENGTH_SHORT).show()
                                     }
-                                    context.startActivity(intent)
                                 }, modifier = Modifier.size(28.dp)) { Icon(Icons.Filled.Visibility, contentDescription = "عرض", tint = DeepGreen, modifier = Modifier.size(14.dp)) }
                                 IconButton(onClick = {
                                     val uri = FileProvider.getUriForFile(context, "com.example.fileprovider", report)
                                     val intent = Intent(Intent.ACTION_SEND).apply {
-                                        type = "application/pdf"
+                                        type = mimeType
                                         putExtra(Intent.EXTRA_STREAM, uri)
                                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                     }
@@ -4179,7 +4185,10 @@ fun EditProjectDialog(
                     members.forEach { pm ->
                         val emp = employees.find { it.id == pm.employeeId }
                         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("${emp?.name ?: "موظف"} - ${pm.role}", fontSize = 11.sp)
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("${emp?.name ?: "موظف"}", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                Text("${emp?.role ?: ""} | دور بالمشروع: ${pm.role}", fontSize = 9.sp, color = TextMuted)
+                            }
                             IconButton(onClick = { onRemoveMember(pm.employeeId) }, modifier = Modifier.size(24.dp)) {
                                 Icon(Icons.Filled.Close, contentDescription = "إزالة", tint = CoralRed, modifier = Modifier.size(14.dp))
                             }

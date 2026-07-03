@@ -452,7 +452,9 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
                 fileName = "AdminCenter_Report_${System.currentTimeMillis()}.pdf",
                 branchPerformance = perf,
                 employeeCards = empCards,
-                officeCards = offCards
+                officeCards = offCards,
+                orgName = _orgName.value,
+                branchName = _branchName.value
             )
             _exportedFile.value = pdfFile
             onComplete(pdfFile)
@@ -463,7 +465,7 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
         viewModelScope.launch {
             val card = repository.getEmployeeReportCard(employeeId) ?: return@launch
             val tasks = repository.getTasksByEmployee(employeeId).first()
-            val file = ReportExporter.exportEmployeeReportToPdf(context, card, tasks)
+            val file = ReportExporter.exportEmployeeReportToPdf(context, card, tasks, _orgName.value, _branchName.value)
             _exportedFile.value = file
             onComplete(file)
         }
@@ -472,7 +474,7 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
     fun exportOfficePdf(context: Context, officeId: Int, onComplete: (File) -> Unit) {
         viewModelScope.launch {
             val card = repository.getOfficeReportCard(officeId) ?: return@launch
-            val file = ReportExporter.exportOfficeReportToPdf(context, card)
+            val file = ReportExporter.exportOfficeReportToPdf(context, card, _orgName.value, _branchName.value)
             _exportedFile.value = file
             onComplete(file)
         }
@@ -481,7 +483,7 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
     fun exportDepartmentPdf(context: Context, departmentId: Int, onComplete: (File) -> Unit) {
         viewModelScope.launch {
             val card = repository.getDepartmentReportCards().find { it.departmentId == departmentId } ?: return@launch
-            val file = ReportExporter.exportDepartmentReportToPdf(context, card)
+            val file = ReportExporter.exportDepartmentReportToPdf(context, card, _orgName.value, _branchName.value)
             _exportedFile.value = file
             onComplete(file)
         }
@@ -491,7 +493,7 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
         viewModelScope.launch {
             val tasks = repository.getAllTasks().first().filter { it.projectId == project.id }
             val members = repository.getEmployeesByProject(project.id).first()
-            val file = ReportExporter.exportProjectReportToPdf(context, project, tasks, members)
+            val file = ReportExporter.exportProjectReportToPdf(context, project, tasks, members, _orgName.value, _branchName.value)
             _exportedFile.value = file
             onComplete(file)
         }
@@ -502,7 +504,7 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
             val invoices = repository.getAllInvoices().first()
             val offices = repository.getAllOffices().first()
             val total = repository.getTotalInvoiceSumFlow().first() ?: 0.0
-            val file = ReportExporter.exportInvoicesReportToPdf(context, invoices, offices, total)
+            val file = ReportExporter.exportInvoicesReportToPdf(context, invoices, offices, total, _orgName.value, _branchName.value)
             _exportedFile.value = file
             onComplete(file)
         }
@@ -514,7 +516,7 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
             val offices = repository.getAllOffices().first()
             val deptCards = repository.getDepartmentReportCards()
             val total = repository.getTotalInvoiceSumFlow().first() ?: 0.0
-            val file = ReportExporter.exportFinancialReportToPdf(context, invoices, offices, deptCards, total)
+            val file = ReportExporter.exportFinancialReportToPdf(context, invoices, offices, deptCards, total, _orgName.value, _branchName.value)
             _exportedFile.value = file
             onComplete(file)
         }
@@ -612,7 +614,9 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
                 fileName = "AdminCenter_Report_${System.currentTimeMillis()}.csv",
                 branchPerformance = perf,
                 employeeCards = empCards,
-                officeCards = offCards
+                officeCards = offCards,
+                orgName = _orgName.value,
+                branchName = _branchName.value
             )
             _exportedFile.value = csvFile
             onComplete(csvFile)

@@ -28,8 +28,8 @@ fun todayIsoDate(): String =
 fun isoToDisplay(iso: String): String {
     if (iso.isBlank()) return ""
     return try {
-        val parser = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-        val formatter = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+        val parser = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        val formatter = SimpleDateFormat("dd/MM/yyyy", Locale.US)
         formatter.format(parser.parse(iso)!!)
     } catch (_: Exception) {
         iso
@@ -133,13 +133,12 @@ fun DatePickerField(
     if (showPicker) {
         val initialMillis = try {
             if (selectedDate.isNotBlank()) {
-                SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).parse(selectedDate)?.time
+                SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(selectedDate)?.time
             } else null
         } catch (_: Exception) {
             null
         } ?: System.currentTimeMillis()
         val state = rememberDatePickerState(initialSelectedDateMillis = initialMillis)
-        LaunchedEffect(state.selectedDateMillis) { state.selectedDateMillis?.let { } }
         DatePickerDialog(
             onDismissRequest = { showPicker = false },
             confirmButton = {
@@ -147,7 +146,7 @@ fun DatePickerField(
                     state.selectedDateMillis?.let { millis ->
                         val cal = Calendar.getInstance().apply { timeInMillis = millis }
                         val iso = String.format(
-                            Locale.getDefault(),
+                            Locale.US,
                             "%04d-%02d-%02d",
                             cal.get(Calendar.YEAR),
                             cal.get(Calendar.MONTH) + 1,

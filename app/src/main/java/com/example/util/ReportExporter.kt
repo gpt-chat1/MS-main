@@ -15,6 +15,7 @@ import com.example.data.entity.Office
 import com.example.data.entity.OfficeEvaluationSummary
 import com.example.data.entity.OfficeReportCard
 import com.example.data.entity.Project
+import com.example.data.entity.Employee
 import com.example.data.entity.Task
 import java.io.File
 import java.io.FileOutputStream
@@ -30,7 +31,9 @@ object ReportExporter {
         fileName: String,
         branchPerformance: String,
         employeeCards: List<EmployeeReportCard>,
-        officeCards: List<OfficeReportCard>
+        officeCards: List<OfficeReportCard>,
+        orgName: String = "",
+        branchName: String = ""
     ): File {
         val pdfDocument = PdfDocument()
         
@@ -73,16 +76,26 @@ object ReportExporter {
         }
         canvas.drawRect(0f, 0f, 595f, 90f, bannerPaint)
 
-        // Header Title (Al-Shaheen Arabic/English report title)
+        // Header Title (Dynamic org/branch based)
         headerPaint.color = Color.WHITE
-        canvas.drawText("بوابة الشاهين للإدارة - تقرير الأداء والتحليلات الشامل", 40f, 50f, headerPaint)
+        val headerText = if (orgName.isNotEmpty() && branchName.isNotEmpty()) {
+            "الإدارة: $orgName  •  الفرع: $branchName"
+        } else {
+            "بوابة الشاهين للإدارة - تقرير الأداء والتحليلات الشامل"
+        }
+        canvas.drawText(headerText, 40f, 50f, headerPaint)
         
         val subHeaderPaint = Paint().apply {
             color = Color.parseColor("#B9A779")
             textSize = 10f
             isAntiAlias = true
         }
-        canvas.drawText("Al-Shaheen Portal Regional Operations and Performance Audit Report", 40f, 75f, subHeaderPaint)
+        val subHeaderText = if (orgName.isNotEmpty() && branchName.isNotEmpty()) {
+            "تقرير: الأداء والتحليلات الشامل"
+        } else {
+            "Al-Shaheen Portal Regional Operations and Performance Audit Report"
+        }
+        canvas.drawText(subHeaderText, 40f, 75f, subHeaderPaint)
 
         // Reset text paint style for report details
         textPaint.color = Color.parseColor("#1B1C15")
@@ -217,11 +230,16 @@ object ReportExporter {
         fileName: String,
         branchPerformance: String,
         employeeCards: List<EmployeeReportCard>,
-        officeCards: List<OfficeReportCard>
+        officeCards: List<OfficeReportCard>,
+        orgName: String = "",
+        branchName: String = ""
     ): File {
         val stringBuilder = StringBuilder()
 
         // 1. Title Sheet
+        if (orgName.isNotEmpty() && branchName.isNotEmpty()) {
+            stringBuilder.append("الإدارة: $orgName  •  الفرع: $branchName\n")
+        }
         stringBuilder.append("AdminCenter - Regional Performance Report\n")
         stringBuilder.append("Generated on: 2026-06-29\n")
         stringBuilder.append("Overall Efficiency Metric: $branchPerformance\n\n")
@@ -254,7 +272,9 @@ object ReportExporter {
         context: Context,
         fileName: String,
         employeeName: String,
-        evaluations: List<EmployeeEvaluationCard>
+        evaluations: List<EmployeeEvaluationCard>,
+        orgName: String = "",
+        branchName: String = ""
     ): File {
         val pdfDocument = PdfDocument()
         val pageInfo = PdfDocument.PageInfo.Builder(595, 842, 1).create()
@@ -268,10 +288,20 @@ object ReportExporter {
         canvas.drawRect(0f, 0f, 595f, 90f, bannerPaint)
 
         val headerPaint = Paint().apply { color = Color.WHITE; textSize = 18f; isFakeBoldText = true; isAntiAlias = true }
-        canvas.drawText("تقرير تقييم الأداء الوظيفي", 40f, 45f, headerPaint)
+        val headerText = if (orgName.isNotEmpty() && branchName.isNotEmpty()) {
+            "الإدارة: $orgName  •  الفرع: $branchName"
+        } else {
+            "تقرير تقييم الأداء الوظيفي"
+        }
+        canvas.drawText(headerText, 40f, 45f, headerPaint)
 
         val subPaint = Paint().apply { color = Color.parseColor("#B9A779"); textSize = 10f; isAntiAlias = true }
-        canvas.drawText("Employee Performance Evaluation Report", 40f, 70f, subPaint)
+        val subHeaderText = if (orgName.isNotEmpty() && branchName.isNotEmpty()) {
+            "تقرير: تقييم الأداء الوظيفي"
+        } else {
+            "Employee Performance Evaluation Report"
+        }
+        canvas.drawText(subHeaderText, 40f, 70f, subPaint)
 
         val sectionPaint = Paint().apply { color = Color.parseColor("#B9A779"); textSize = 13f; isFakeBoldText = true; isAntiAlias = true }
         var y = 120f
@@ -340,11 +370,11 @@ object ReportExporter {
         return csvFile
     }
 
-    fun exportEmployeeReportToPdf(context: Context, card: EmployeeReportCard, tasks: List<Task>): File {
+    fun exportEmployeeReportToPdf(context: Context, card: EmployeeReportCard, tasks: List<Task>, orgName: String = "", branchName: String = ""): File {
         val pdf = PdfDocument()
         val page = pdf.startPage(PdfDocument.PageInfo.Builder(595, 842, 1).create())
         val canvas = page.canvas
-        drawPdfHeader(canvas, "تقرير الموظف: ${card.employeeName}")
+        drawPdfHeader(canvas, "تقرير الموظف: ${card.employeeName}", orgName, branchName)
         var y = 120f
         val text = textPaint()
         val bold = boldPaint()
@@ -363,11 +393,11 @@ object ReportExporter {
         return writePdf(context, pdf, "Employee_${card.employeeId}_${System.currentTimeMillis()}.pdf")
     }
 
-    fun exportOfficeReportToPdf(context: Context, card: OfficeReportCard): File {
+    fun exportOfficeReportToPdf(context: Context, card: OfficeReportCard, orgName: String = "", branchName: String = ""): File {
         val pdf = PdfDocument()
         val page = pdf.startPage(PdfDocument.PageInfo.Builder(595, 842, 1).create())
         val canvas = page.canvas
-        drawPdfHeader(canvas, "تقرير المكتب: ${card.officeName}")
+        drawPdfHeader(canvas, "تقرير المكتب: ${card.officeName}", orgName, branchName)
         var y = 120f
         val text = textPaint()
         val bold = boldPaint()
@@ -380,11 +410,11 @@ object ReportExporter {
         return writePdf(context, pdf, "Office_${card.officeId}_${System.currentTimeMillis()}.pdf")
     }
 
-    fun exportDepartmentReportToPdf(context: Context, card: DepartmentReportCard): File {
+    fun exportDepartmentReportToPdf(context: Context, card: DepartmentReportCard, orgName: String = "", branchName: String = ""): File {
         val pdf = PdfDocument()
         val page = pdf.startPage(PdfDocument.PageInfo.Builder(595, 842, 1).create())
         val canvas = page.canvas
-        drawPdfHeader(canvas, "تقرير القسم: ${card.departmentName}")
+        drawPdfHeader(canvas, "تقرير القسم: ${card.departmentName}", orgName, branchName)
         var y = 120f
         val text = textPaint()
         canvas.drawText("عدد المكاتب: ${card.officeCount}", 40f, y, text); y += 18f
@@ -395,11 +425,11 @@ object ReportExporter {
         return writePdf(context, pdf, "Department_${card.departmentId}_${System.currentTimeMillis()}.pdf")
     }
 
-    fun exportProjectReportToPdf(context: Context, project: Project, tasks: List<Task>, members: List<com.example.data.entity.Employee>): File {
+    fun exportProjectReportToPdf(context: Context, project: Project, tasks: List<Task>, members: List<Employee>, orgName: String = "", branchName: String = ""): File {
         val pdf = PdfDocument()
         val page = pdf.startPage(PdfDocument.PageInfo.Builder(595, 842, 1).create())
         val canvas = page.canvas
-        drawPdfHeader(canvas, "تقرير المشروع: ${project.name}")
+        drawPdfHeader(canvas, "تقرير المشروع: ${project.name}", orgName, branchName)
         var y = 120f
         val text = textPaint()
         val bold = boldPaint()
@@ -420,11 +450,11 @@ object ReportExporter {
         return writePdf(context, pdf, "Project_${project.id}_${System.currentTimeMillis()}.pdf")
     }
 
-    fun exportInvoicesReportToPdf(context: Context, invoices: List<Invoice>, offices: List<Office>, total: Double): File {
+    fun exportInvoicesReportToPdf(context: Context, invoices: List<Invoice>, offices: List<Office>, total: Double, orgName: String = "", branchName: String = ""): File {
         val pdf = PdfDocument()
         val page = pdf.startPage(PdfDocument.PageInfo.Builder(595, 842, 1).create())
         val canvas = page.canvas
-        drawPdfHeader(canvas, "تقرير الفواتير")
+        drawPdfHeader(canvas, "تقرير الفواتير", orgName, branchName)
         var y = 120f
         val text = textPaint()
         val bold = boldPaint()
@@ -444,12 +474,14 @@ object ReportExporter {
         invoices: List<Invoice>,
         offices: List<Office>,
         deptCards: List<DepartmentReportCard>,
-        total: Double
+        total: Double,
+        orgName: String = "",
+        branchName: String = ""
     ): File {
         val pdf = PdfDocument()
         val page = pdf.startPage(PdfDocument.PageInfo.Builder(595, 842, 1).create())
         val canvas = page.canvas
-        drawPdfHeader(canvas, "التقرير المالي الشامل")
+        drawPdfHeader(canvas, "التقرير المالي الشامل", orgName, branchName)
         var y = 120f
         val text = textPaint()
         val bold = boldPaint()
@@ -493,10 +525,15 @@ object ReportExporter {
         )
     }
 
-    private fun drawPdfHeader(canvas: Canvas, title: String) {
+    private fun drawPdfHeader(canvas: Canvas, title: String, orgName: String = "", branchName: String = "") {
         canvas.drawRect(0f, 0f, 595f, 842f, Paint().apply { color = Color.parseColor("#FCFAEE") })
         canvas.drawRect(0f, 0f, 595f, 90f, Paint().apply { color = Color.parseColor("#054239") })
-        canvas.drawText(title, 40f, 55f, Paint().apply { color = Color.WHITE; textSize = 18f; isFakeBoldText = true; isAntiAlias = true })
+        if (orgName.isNotEmpty() && branchName.isNotEmpty()) {
+            canvas.drawText("الإدارة: $orgName  •  الفرع: $branchName", 40f, 50f, Paint().apply { color = Color.WHITE; textSize = 18f; isFakeBoldText = true; isAntiAlias = true })
+            canvas.drawText(title, 40f, 75f, Paint().apply { color = Color.parseColor("#B9A779"); textSize = 10f; isAntiAlias = true })
+        } else {
+            canvas.drawText(title, 40f, 55f, Paint().apply { color = Color.WHITE; textSize = 18f; isFakeBoldText = true; isAntiAlias = true })
+        }
     }
 
     private fun textPaint() = Paint().apply { color = Color.parseColor("#1B1C15"); textSize = 11f; isAntiAlias = true }
