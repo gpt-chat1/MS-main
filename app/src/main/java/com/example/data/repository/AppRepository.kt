@@ -113,6 +113,8 @@ class AppRepository(
     fun getActiveEmployees(): Flow<List<Employee>> = employeeDao.getActiveEmployees()
     fun getEmployeesByOffice(officeId: Int): Flow<List<Employee>> = employeeDao.getEmployeesByOffice(officeId)
     fun searchEmployees(query: String): Flow<List<Employee>> = employeeDao.searchEmployees(query)
+    fun searchTasks(query: String): Flow<List<Task>> = taskDao.searchTasks(query)
+    fun searchProjects(query: String): Flow<List<Project>> = projectDao.searchProjects(query)
     suspend fun insertEmployee(employee: Employee): RepositoryResult<Long> {
         if (employee.name.isBlank()) return RepositoryResult.Failure("اسم الموظف مطلوب")
         if (employee.role.isBlank()) return RepositoryResult.Failure("منصب الموظف مطلوب")

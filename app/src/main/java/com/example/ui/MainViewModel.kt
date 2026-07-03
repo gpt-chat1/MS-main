@@ -1,10 +1,16 @@
 package com.example.ui
 
+import android.content.ContentValues
 import android.content.Context
+import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
 import android.widget.Toast
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.data.db.AppDatabase
 import com.example.data.entity.*
 import com.example.data.repository.AppRepository
 import com.example.data.repository.RepositoryResult
@@ -511,6 +517,84 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
             val file = ReportExporter.exportFinancialReportToPdf(context, invoices, offices, deptCards, total)
             _exportedFile.value = file
             onComplete(file)
+        }
+    }
+
+    fun searchTasks(query: String) = repository.searchTasks(query)
+
+    fun searchProjects(query: String) = repository.searchProjects(query)
+
+    // ──────────── REPORTS STORAGE ────────────
+    private val _savedReports = MutableStateFlow<List<File>>(emptyList())
+    val savedReports: StateFlow<List<File>> = _savedReports.asStateFlow()
+
+    fun refreshSavedReports(context: Context) {
+        val dir = File(context.filesDir, "reports")
+        _savedReports.value = if (dir.exists()) dir.listFiles()?.sortedByDescending { it.lastModified() }?.toList() ?: emptyList() else emptyList()
+    }
+
+    fun saveReportCopy(context: Context, file: File) {
+        val dir = File(context.filesDir, "reports")
+        if (!dir.exists()) dir.mkdirs()
+        val dest = File(dir, file.name)
+        file.copyTo(dest, overwrite = true)
+        refreshSavedReports(context)
+    }
+
+    // ──────────── BACKUP / RESTORE ────────────
+    fun backupDatabase(context: Context, onComplete: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val dbPath = context.getDatabasePath("managerhub_database")
+                if (!dbPath.exists()) { onComplete(false); return@launch }
+                val time = SimpleDateFormat("yyyy-MM-dd_HH-mm", Locale.getDefault()).format(Date())
+                val backupName = "مديري_الذكي_نسخة_احتياطية_$time.db"
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    val values = ContentValues().apply {
+                        put(MediaStore.Downloads.DISPLAY_NAME, backupName)
+                        put(MediaStore.Downloads.MIME_TYPE, "application/octet-stream")
+                        put(MediaStore.Downloads.RELATIVE_PATH, "Download/مديري الذكي")
+                    }
+                    val uri = context.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                    if (uri != null) {
+                        context.contentResolver.openOutputStream(uri)?.use { out ->
+                            dbPath.inputStream().use { inp -> inp.copyTo(out) }
+                        }
+                    }
+                } else {
+                    val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                    val dest = File(downloadsDir, backupName)
+                    dbPath.inputStream().use { inp -> dest.outputStream().use { out -> inp.copyTo(out) } }
+                }
+                Toast.makeText(context, "تم النسخ الاحتياطي: $backupName", Toast.LENGTH_LONG).show()
+                onComplete(true)
+            } catch (e: Exception) {
+                Toast.makeText(context, "فشل النسخ الاحتياطي: ${e.message}", Toast.LENGTH_LONG).show()
+                onComplete(false)
+            }
+        }
+    }
+
+    fun restoreDatabase(context: Context, uri: Uri, onComplete: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val dbPath = context.getDatabasePath("managerhub_database")
+                dbPath.parentFile?.mkdirs()
+                context.contentResolver.openInputStream(uri)?.use { inp ->
+                    dbPath.outputStream().use { out -> inp.copyTo(out) }
+                }
+                // Also copy WAL and SHM if they exist
+                listOf("-wal", "-shm").forEach { suffix ->
+                    val f = File(dbPath.absolutePath + suffix)
+                    if (f.exists()) f.delete()
+                }
+                AppDatabase.closeInstance()
+                Toast.makeText(context, "تم استعادة قاعدة البيانات بنجاح", Toast.LENGTH_LONG).show()
+                onComplete(true)
+            } catch (e: Exception) {
+                Toast.makeText(context, "فشل الاستعادة: ${e.message}", Toast.LENGTH_LONG).show()
+                onComplete(false)
+            }
         }
     }
 

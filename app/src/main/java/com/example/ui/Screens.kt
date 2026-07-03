@@ -3240,6 +3240,12 @@ fun ProjectsScreen(viewModel: MainViewModel) {
     val depts by viewModel.departments.collectAsState()
     val officesList by viewModel.offices.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
+    var projectSearchQuery by remember { mutableStateOf("") }
+
+    val filteredProjects = remember(projectsList, projectSearchQuery) {
+        if (projectSearchQuery.isBlank()) projectsList
+        else projectsList.filter { it.name.contains(projectSearchQuery, ignoreCase = true) || it.description.contains(projectSearchQuery, ignoreCase = true) }
+    }
 
     Column(
         modifier = Modifier
@@ -3253,7 +3259,17 @@ fun ProjectsScreen(viewModel: MainViewModel) {
             Text("إدارة المشاريع وتتبع التقدم والإنجازات", fontSize = 12.sp, color = TextMuted)
         }
 
-        if (projectsList.isEmpty()) {
+        // Search bar
+        ShaheenOutlinedTextField(
+            value = projectSearchQuery,
+            onValueChange = { projectSearchQuery = it },
+            placeholder = { Text("البحث عن مشروع...") },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null, tint = DeepGreen) }
+        )
+
+        if (filteredProjects.isEmpty()) {
             Box(
                 modifier = Modifier.fillMaxWidth().padding(vertical = 40.dp),
                 contentAlignment = Alignment.Center
@@ -3266,7 +3282,7 @@ fun ProjectsScreen(viewModel: MainViewModel) {
                 }
             }
         } else {
-            projectsList.forEach { project ->
+            filteredProjects.forEach { project ->
                 val deptName = depts.find { it.id == project.departmentId }?.name
                 val officeName = officesList.find { it.id == project.officeId }?.name
                 ProjectCard(project = project, deptName = deptName, officeName = officeName, onClick = { viewModel.selectProject(project.id) })
@@ -3736,6 +3752,7 @@ fun SettingsScreen(viewModel: MainViewModel) {
                             exporting = true
                             viewModel.exportPdf(context) { file ->
                                 exporting = false
+                                viewModel.saveReportCopy(context, file)
                                 val shareIntent = Intent(Intent.ACTION_SEND).apply {
                                     type = "application/pdf"
                                     putExtra(Intent.EXTRA_STREAM, FileProvider.getUriForFile(context, "com.example.fileprovider", file))
@@ -3753,6 +3770,7 @@ fun SettingsScreen(viewModel: MainViewModel) {
                             exporting = true
                             viewModel.exportExcel(context) { file ->
                                 exporting = false
+                                viewModel.saveReportCopy(context, file)
                                 val shareIntent = Intent(Intent.ACTION_SEND).apply {
                                     type = "text/csv"
                                     putExtra(Intent.EXTRA_STREAM, FileProvider.getUriForFile(context, "com.example.fileprovider", file))
@@ -3765,6 +3783,83 @@ fun SettingsScreen(viewModel: MainViewModel) {
                         colors = ButtonDefaults.buttonColors(containerColor = Gold),
                         shape = RoundedCornerShape(8.dp)
                     ) { Text(if (exporting) "جار التصدير..." else "تصدير Excel", color = DeepGreen, fontSize = 12.sp) }
+                }
+            }
+        }
+
+        // Backup & Restore card
+        Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("النسخ الاحتياطي", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = DeepGreen)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text("تصدير قاعدة البيانات للاحتياط أو استعادتها من نسخة سابقة", fontSize = 11.sp, color = TextMuted)
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    var backingUp by remember { mutableStateOf(false) }
+                    Button(
+                        onClick = {
+                            backingUp = true
+                            viewModel.backupDatabase(context) { backingUp = false }
+                        },
+                        enabled = !backingUp,
+                        colors = ButtonDefaults.buttonColors(containerColor = DeepGreen),
+                        shape = RoundedCornerShape(8.dp), modifier = Modifier.weight(1f)
+                    ) { Text(if (backingUp) "جار النسخ..." else "نسخ احتياطي", color = Color.White, fontSize = 12.sp) }
+                    var showRestorePicker by remember { mutableStateOf(false) }
+                    val restoreLauncher = rememberLauncherForActivityResult(
+                        contract = ActivityResultContracts.GetContent()
+                    ) { uri ->
+                        uri?.let { viewModel.restoreDatabase(context, it) { } }
+                    }
+                    Button(
+                        onClick = { restoreLauncher.launch("application/octet-stream") },
+                        colors = ButtonDefaults.buttonColors(containerColor = Gold),
+                        shape = RoundedCornerShape(8.dp), modifier = Modifier.weight(1f)
+                    ) { Text("استعادة", color = DeepGreen, fontSize = 12.sp) }
+                }
+            }
+        }
+
+        // Saved reports card
+        val savedReports by viewModel.savedReports.collectAsState()
+        LaunchedEffect(Unit) { viewModel.refreshSavedReports(context) }
+        Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("التقارير المصدرة", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = DeepGreen)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text("التقارير التي تم تصديرها سابقاً", fontSize = 11.sp, color = TextMuted)
+                Spacer(modifier = Modifier.height(8.dp))
+                if (savedReports.isEmpty()) {
+                    Text("لا توجد تقارير مصدرة بعد", fontSize = 12.sp, color = TextMuted)
+                } else {
+                    savedReports.take(10).forEach { report ->
+                        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(report.name, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TextDark)
+                                Text(SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(report.lastModified())), fontSize = 9.sp, color = TextMuted)
+                            }
+                            Row {
+                                IconButton(onClick = {
+                                    val uri = FileProvider.getUriForFile(context, "com.example.fileprovider", report)
+                                    val intent = Intent(Intent.ACTION_VIEW).apply {
+                                        setDataAndType(uri, "application/pdf")
+                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    }
+                                    context.startActivity(intent)
+                                }, modifier = Modifier.size(28.dp)) { Icon(Icons.Filled.Visibility, contentDescription = "عرض", tint = DeepGreen, modifier = Modifier.size(14.dp)) }
+                                IconButton(onClick = {
+                                    val uri = FileProvider.getUriForFile(context, "com.example.fileprovider", report)
+                                    val intent = Intent(Intent.ACTION_SEND).apply {
+                                        type = "application/pdf"
+                                        putExtra(Intent.EXTRA_STREAM, uri)
+                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    }
+                                    context.startActivity(Intent.createChooser(intent, "مشاركة"))
+                                }, modifier = Modifier.size(28.dp)) { Icon(Icons.Filled.Share, contentDescription = "مشاركة", tint = Gold, modifier = Modifier.size(14.dp)) }
+                                IconButton(onClick = { report.delete(); viewModel.refreshSavedReports(context) }, modifier = Modifier.size(28.dp)) { Icon(Icons.Filled.Delete, contentDescription = "حذف", tint = CoralRed, modifier = Modifier.size(14.dp)) }
+                            }
+                        }
+                    }
                 }
             }
         }

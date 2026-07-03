@@ -119,6 +119,9 @@ interface TaskDao {
     @Query("SELECT * FROM tasks WHERE employeeId = :employeeId ORDER BY id DESC")
     fun getTasksByEmployee(employeeId: Int): Flow<List<Task>>
 
+    @Query("SELECT * FROM tasks WHERE title LIKE '%' || :query || '%' OR description LIKE '%' || :query || '%' ORDER BY id DESC")
+    fun searchTasks(query: String): Flow<List<Task>>
+
     @Query("SELECT * FROM tasks WHERE projectId = :projectId ORDER BY sortOrder ASC, id ASC")
     fun getTasksByProjectOrdered(projectId: Int): Flow<List<Task>>
 
@@ -372,6 +375,9 @@ interface ProjectDao {
 
     @Query("SELECT * FROM projects WHERE id = :id")
     suspend fun getProjectById(id: Int): Project?
+
+    @Query("SELECT * FROM projects WHERE name LIKE '%' || :query || '%' OR description LIKE '%' || :query || '%' ORDER BY dueDate ASC")
+    fun searchProjects(query: String): Flow<List<Project>>
 
     @Query("""
         SELECT p.* FROM projects p 
