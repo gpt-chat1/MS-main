@@ -58,6 +58,7 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
     val tasks = repository.getAllTasks().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val invoices = repository.getAllInvoices().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val penalties = repository.getAllPenalties().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val attendanceList = repository.getAllAttendance().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val timelineFeed = repository.timelineFeed
 
     // Project reactive streams
@@ -101,10 +102,14 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "84%")
 
-    val averageAttendanceRate = combine(employees) { _ ->
-        // Dynamically compute attendance rate or return healthy average
-        "94.8%"
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "94.8%")
+    val averageAttendanceRate = combine(attendanceList, employees) { att, _ ->
+        if (att.isEmpty()) "95%"
+        else {
+            val present = att.count { it.status == "Present" }
+            val pct = (present.toDouble() / att.size.toDouble()) * 100
+            String.format("%.0f%%", pct)
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "95%")
 
     val overallEfficiencyScore = tasks.map { taskList ->
         if (taskList.isEmpty()) "9.2"

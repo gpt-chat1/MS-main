@@ -2291,10 +2291,12 @@ fun ReportsAnalyticsScreen(viewModel: MainViewModel) {
                 textColor = DeepGreen
             )
         }
-        // Top-rated Employees (replaces overall branch performance)
+        // Top-rated Employees (filtered by period)
         var topEvals by remember { mutableStateOf<List<EmployeeEvaluation>>(emptyList()) }
-        LaunchedEffect(Unit) {
-            topEvals = viewModel.getAllEvaluations().sortedByDescending { it.totalScore }
+        LaunchedEffect(selectedPeriod) {
+            val all = viewModel.getAllEvaluations()
+            val (start, _) = periodDateRange(selectedPeriod)
+            topEvals = all.filter { it.createdAt >= start }.sortedByDescending { it.totalScore }
         }
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -3593,6 +3595,53 @@ fun SettingsScreen(viewModel: MainViewModel) {
                 SettingsInfoRow("اسم الحزمة", "com.example")
                 SettingsInfoRow("قاعدة البيانات", "Room (SQLite)")
                 SettingsInfoRow("واجهة المستخدم", "Jetpack Compose + Material3")
+            }
+        }
+
+        // Export card
+        var exporting by remember { mutableStateOf(false) }
+        Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("تصدير التقارير", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = DeepGreen)
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("تصدير تقارير الأداء والفواتير بصيغة PDF أو Excel", fontSize = 11.sp, color = TextMuted)
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Button(
+                        onClick = {
+                            exporting = true
+                            viewModel.exportPdf(context) { file ->
+                                exporting = false
+                                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                    type = "application/pdf"
+                                    putExtra(Intent.EXTRA_STREAM, FileProvider.getUriForFile(context, "com.example.fileprovider", file))
+                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                }
+                                context.startActivity(Intent.createChooser(shareIntent, "مشاركة تقرير PDF"))
+                            }
+                        },
+                        enabled = !exporting,
+                        colors = ButtonDefaults.buttonColors(containerColor = DeepGreen),
+                        shape = RoundedCornerShape(8.dp)
+                    ) { Text(if (exporting) "جار التصدير..." else "تصدير PDF", color = Color.White, fontSize = 12.sp) }
+                    Button(
+                        onClick = {
+                            exporting = true
+                            viewModel.exportExcel(context) { file ->
+                                exporting = false
+                                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/csv"
+                                    putExtra(Intent.EXTRA_STREAM, FileProvider.getUriForFile(context, "com.example.fileprovider", file))
+                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                }
+                                context.startActivity(Intent.createChooser(shareIntent, "مشاركة تقرير Excel"))
+                            }
+                        },
+                        enabled = !exporting,
+                        colors = ButtonDefaults.buttonColors(containerColor = Gold),
+                        shape = RoundedCornerShape(8.dp)
+                    ) { Text(if (exporting) "جار التصدير..." else "تصدير Excel", color = DeepGreen, fontSize = 12.sp) }
+                }
             }
         }
 
